@@ -1,0 +1,182 @@
+---
+title: "Using Meaning Extraction Method (MEM) to Find the Themes in Anger Narratives"
+author: "Pooya Razavi"
+date: "2022-12-14"
+output: 
+  html_document:
+    toc: true
+    theme: united
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+#load libraries
+package_list <- c("dplyr", "tidyr", "ggplot2", "tidytext", "topicmodels", "stm")
+lapply(package_list, require, character.only = TRUE)
+
+
+df_binary <- read.csv("C:/Users/Pooya/Dropbox (University of Oregon)/Anger Dissertation/LIWC/MEM/ngram1 threshold2_5percent/LIWC-22 Results - Narratives_for_LIWC - MEM Binary.csv")
+
+word_frequency <- read.csv("C:/Users/Pooya/Dropbox (University of Oregon)/Anger Dissertation/LIWC/MEM/ngram1 threshold2_5percent/LIWC-22 Results - Narratives_for_LIWC - MEM Frequencies.csv")
+
+#find and remove words with >= 30% frequency
+word_list <- word_frequency %>% 
+              filter(Percentage.of.Rows.with.Word >= 30 | Percentage.of.Rows.with.Word < 5) %>% 
+              select(Word)
+
+df_binary1 <- df_binary %>% 
+                select(-word_list$Word)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# PCA
+
+```{r}
+#create a tetrachoric correlation matrix
+tetra_matrix <- df_binary1 %>% 
+                  select(situation:eventually) %>% 
+                    psych::tetrachoric()
+#scree plot
+tetra_matrix[["rho"]] %>% 
+  psych::scree(hline = -1, factors = FALSE)
+
+#parallel analysis
+tetra_matrix[["rho"]] %>% 
+  psych::fa.parallel(n.obs = 1172, fa = "pc", fm = "ml")
+
+#6c
+pca_6comp <- tetra_matrix[["rho"]] %>%  
+                psych::principal(nfactors = 6)
+
+
+six_comp_outcome <- psych::kaiser(pca_6comp, rotate = "Varimax") %>% psych::fa.sort()
+
+six_comp_outcome[["loadings"]] %>% 
+                    knitr::kable(digits = 2) %>%
+                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+                    kableExtra::kable_paper(full_width = F)
+
+#7c
+pca_7comp <- tetra_matrix[["rho"]] %>%  
+                psych::principal(nfactors = 7)
+
+
+seven_comp_outcome <- psych::kaiser(pca_7comp, rotate = "Varimax") %>% psych::fa.sort()
+
+seven_comp_outcome[["loadings"]] %>% 
+                    knitr::kable(digits = 2) %>%
+                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+                    kableExtra::kable_paper(full_width = F)
+
+#8c
+pca_8comp <- tetra_matrix[["rho"]] %>%  
+                psych::principal(nfactors = 8)
+
+
+eight_comp_outcome <- psych::kaiser(pca_8comp, rotate = "Varimax") %>% psych::fa.sort()
+
+eight_comp_outcome[["loadings"]] %>% 
+                    knitr::kable(digits = 2) %>%
+                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+                    kableExtra::kable_paper(full_width = F)
+
+#9c
+pca_9comp <- tetra_matrix[["rho"]] %>%  
+                psych::principal(nfactors = 9)
+
+
+nine_comp_outcome <- psych::kaiser(pca_9comp, rotate = "Varimax") %>% psych::fa.sort()
+
+nine_comp_outcome[["loadings"]] %>% 
+                    knitr::kable(digits = 2) %>%
+                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+                    kableExtra::kable_paper(full_width = F)
+
+#lets visualize the 7c
+top_loading_words <- seven_comp_outcome[["loadings"]] %>% 
+                        as.data.frame() %>% 
+                        tibble::rownames_to_column("Word") %>% 
+                        pivot_longer(cols = contains("RC"),
+                                     names_to = "Component",
+                                     values_to = "Loading") %>% 
+                        group_by(Component) %>% 
+                                      slice_max(Loading, n = 20) %>% 
+                                      ungroup() %>% 
+                                      arrange(Component, -Loading)
+
+
+top_loading_words %>% 
+  group_by(Component) %>% 
+  mutate(Word = forcats::fct_reorder(Word, Loading)) %>% 
+  #ungroup() %>% 
+  filter(Loading >= 0.35) %>% 
+      ggplot(aes(Loading, Word, fill = factor(Component))) + 
+      geom_col(show.legend = FALSE) + 
+      facet_wrap(~ Component, scales = "free")
+
+#Word cloud
+top_words_filtered <- eight_comp_outcome[["loadings"]] %>% 
+                        as.data.frame() %>% 
+                        tibble::rownames_to_column("Word") %>% 
+                        pivot_longer(cols = contains("RC"),
+                                     names_to = "Component",
+                                     values_to = "Loading") %>% 
+                        group_by(Component) %>% 
+                                      slice_max(Loading, n = 15) %>% 
+                                      ungroup() %>% 
+                                      arrange(Component, -Loading) %>% 
+                        mutate(Word = forcats::fct_reorder(Word, Loading)) %>% 
+                        filter(Loading >= 0.35)
+
+top_words_filtered %>% 
+    ggplot(aes(label = Word, size = Loading, color = factor(sample.int(10, nrow(top_words_filtered), replace = TRUE)))) +
+    ggwordcloud::geom_text_wordcloud(rm_outside = TRUE) +
+    scale_size_area(max_size = 10) +
+    facet_wrap(~ Component) +
+    theme_minimal()
+```
+
+
+```{r}
+
+###what if we do 6c with pearson's cor?
+pca_6comp <- df_binary1 %>% 
+                  select(situation:eventually) %>% 
+                psych::principal(nfactors = 6)
+
+six_comp_outcome <- psych::kaiser(pca_6comp, rotate = "Varimax") %>% psych::fa.sort()
+
+six_comp_outcome[["loadings"]] %>% 
+                    knitr::kable(digits = 2) %>%
+                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+                    kableExtra::kable_paper(full_width = F)
+
+
+#four components
+pca_9comp <- df_binary1 %>% 
+                  select(situation:eventually) %>% 
+                psych::principal(nfactors = 9)
+
+nine_comp_outcome <- psych::kaiser(pca_9comp, rotate = "Varimax") %>% psych::fa.sort()
+
+nine_comp_outcome[["loadings"]] %>% 
+                    knitr::kable(digits = 2) %>%
+                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+                    kableExtra::kable_paper(full_width = F)
+
+#nine components
+pca_9comp <- df_binary %>% 
+              select(angry:eventually) %>% 
+                psych::principal(nfactors = 9)
+
+nine_comp_outcome <- psych::kaiser(pca_9comp, rotate = "Varimax") %>% psych::fa.sort()
+
+nine_comp_outcome[["loadings"]] %>% 
+                    knitr::kable(digits = 2) %>%
+                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
+                    kableExtra::kable_paper(full_width = F)
+
+```
+
