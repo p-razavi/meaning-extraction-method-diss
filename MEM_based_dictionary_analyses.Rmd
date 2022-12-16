@@ -1,0 +1,142 @@
+---
+title: "MEM-based Dictionaries"
+author: "Pooya Razavi"
+date: "2022-12-16"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+#load libraries
+package_list <- c("dplyr", "tidyr", "ggplot2", "tidytext", "topicmodels", "rlang")
+lapply(package_list, require, character.only = TRUE)
+
+#read in the cleaned-up df (used in LIWC for MEM)
+df <- read.csv("C:/Users/pooya/Dropbox (University of Oregon)/Anger Dissertation/LIWC/MEM/df_for_MEM.csv") %>% 
+                      select(-X)
+
+#read in the pattern matrix (produced in the MEM_narratives.RMD)
+pattern_matrix <- read.csv("mem_pca_8c_pattern_matrix.csv") %>% 
+                      select(-X)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Functions
+
+```{r}
+#Function to report independent-samples t-test
+  ind_ttest_report <- function(iv, dv) {
+      ttest <- t.test(dv ~ iv)
+      effect_size <- effectsize::cohens_d(dv ~ iv, pooled_sd = FALSE)
+      t <- ttest[["statistic"]] %>% round(2)
+      df <- ttest[["parameter"]] %>% round(1)
+      original_p <- ttest[["p.value"]] %>% round(3)
+      p <- if_else(original_p >= .001, paste0("= ", as.character(original_p)), "< .001")
+      d <- effect_size[1,1] %>% round(2)    
+      
+      print(paste0("t(", df, ") = ", t, ", p ", p, ", d = ", d))
+      
+  }
+```
+
+
+
+# Create Dictionaries
+
+```{r}
+extract_top_words_weights <- function(pattern_matrix, component, thresh = 0.3){
+
+  pattern_matrix %>% 
+    select(word, {{component}}) %>% 
+    filter({{component}} >= thresh)
+  
+}    
+  
+theme_1 <- extract_top_words_weights(pattern_matrix, component = RC1)
+theme_2 <- extract_top_words_weights(pattern_matrix, component = RC2)
+theme_3 <- extract_top_words_weights(pattern_matrix, component = RC3)
+theme_4 <- extract_top_words_weights(pattern_matrix, component = RC4)
+theme_5 <- extract_top_words_weights(pattern_matrix, component = RC5)
+theme_6 <- extract_top_words_weights(pattern_matrix, component = RC6)
+theme_7 <- extract_top_words_weights(pattern_matrix, component = RC7)
+theme_8 <- extract_top_words_weights(pattern_matrix, component = RC8)
+
+
+```
+
+# Preprocessing
+
+```{r}
+tokenized_narratives <- df %>% 
+                            tidytext::unnest_tokens(input = all_narratives,
+                                                    output = word,
+                                                    format = "text",
+                                                    token = "words",
+                                                    drop = TRUE,
+                                                    to_lower = TRUE) %>% 
+                            anti_join(stop_words)
+
+```
+
+# Apply the dictionary
+
+This is by weighting the words based on the component loadings. Not very robust...
+
+```{r}
+theme_1$word[3] <- "break"
+
+
+tokens_w_theme_1 <- tokenized_narratives %>% 
+                          inner_join(theme_1)
+
+tokens_w_theme_1 %>% 
+  group_by(ResponseId) %>% 
+  mutate(theme_1 = mean(RC1)) 
+
+narratives_w_theme1 <- tokens_w_theme_1 %>% 
+                          group_by(ResponseId) %>% 
+                          summarise(aggregate_value = sum(RC1)) %>% 
+                          ungroup() %>% 
+                          inner_join(df) %>% 
+                          select(ResponseId, Condition, all_narratives, aggregate_value)
+
+  
+ind_ttest_report(narratives_w_theme1$Condition, narratives_w_theme1$aggregate_value)
+
+```
+
+
+```{r}
+tokens_w_theme_1_dich <- df %>% 
+                            tidytext::unnest_tokens(input = all_narratives,
+                                                    output = word,
+                                                    format = "text",
+                                                    token = "words",
+                                                    drop = TRUE,
+                                                    to_lower = TRUE) %>% 
+                            anti_join(stop_words) %>% 
+                            mutate(theme_1 = if_else(word %in% theme_1$word, 1, 0))
+
+narratives_w_theme1_dich <- tokens_w_theme_1_dich %>% 
+                                group_by(ResponseId) %>% 
+                                summarise(freq = sum(theme_1)) %>% 
+                                filter(freq != 0) %>% 
+                                ungroup() %>% 
+                                inner_join(df) %>% 
+                                mutate(word_count = stringr::str_count(all_narratives ,"\\W+")) %>% 
+                                mutate(rel_freq = freq*100/word_count) %>% 
+                                select(ResponseId, Condition, all_narratives, word_count, freq, rel_freq)
+
+#frequency
+psych::describeBy(narratives_w_theme1_dich$freq, group = narratives_w_theme1_dich$Condition)
+ind_ttest_report(narratives_w_theme1_dich$Condition, narratives_w_theme1_dich$freq)
+
+#relative frequency
+psych::describeBy(narratives_w_theme1_dich$rel_freq, group = narratives_w_theme1_dich$Condition)
+ind_ttest_report(narratives_w_theme1_dich$Condition, narratives_w_theme1_dich$rel_freq)
+
+
+```
+
