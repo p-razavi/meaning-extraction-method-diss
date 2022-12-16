@@ -16,9 +16,9 @@ package_list <- c("dplyr", "tidyr", "ggplot2", "tidytext", "topicmodels", "stm")
 lapply(package_list, require, character.only = TRUE)
 
 
-df_binary <- read.csv("C:/Users/Pooya/Dropbox (University of Oregon)/Anger Dissertation/LIWC/MEM/ngram1 threshold2_5percent/LIWC-22 Results - Narratives_for_LIWC - MEM Binary.csv")
+df_binary <- read.csv("C:/Users/Pooya/Dropbox (University of Oregon)/Anger Dissertation/LIWC/MEM/ngram1 threshold2_5percent/LIWC-22 Results - df_for_MEM - MEM Binary.csv")
 
-word_frequency <- read.csv("C:/Users/Pooya/Dropbox (University of Oregon)/Anger Dissertation/LIWC/MEM/ngram1 threshold2_5percent/LIWC-22 Results - Narratives_for_LIWC - MEM Frequencies.csv")
+word_frequency <- read.csv("C:/Users/Pooya/Dropbox (University of Oregon)/Anger Dissertation/LIWC/MEM/ngram1 threshold2_5percent/LIWC-22 Results - df_for_MEM - MEM Frequencies.csv")
 
 #find and remove words with >= 30% frequency
 word_list <- word_frequency %>% 
@@ -31,104 +31,60 @@ df_binary1 <- df_binary %>%
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# PCA
+# Functions
 
-```{r}
-#create a tetrachoric correlation matrix
-tetra_matrix <- df_binary1 %>% 
-                  select(situation:eventually) %>% 
-                    psych::tetrachoric()
-#scree plot
-tetra_matrix[["rho"]] %>% 
-  psych::scree(hline = -1, factors = FALSE)
+```{r pca_table_function}
+#Function to create a table from the pattern matrix
+#x is the correlation matrix
+#nfac is the number of components/factors
 
-#parallel analysis
-tetra_matrix[["rho"]] %>% 
-  psych::fa.parallel(n.obs = 1172, fa = "pc", fm = "ml")
-
-#6c
-pca_6comp <- tetra_matrix[["rho"]] %>%  
-                psych::principal(nfactors = 6)
-
-
-six_comp_outcome <- psych::kaiser(pca_6comp, rotate = "Varimax") %>% psych::fa.sort()
-
-six_comp_outcome[["loadings"]] %>% 
+pca_pattern_table <- function(x, nfac){
+  pca_nf_comp <- x %>%  
+                psych::principal(nfactors = nfac)
+  
+  nf_comp_outcome <- psych::kaiser(pca_nf_comp, rotate = "Varimax") %>% psych::fa.sort()
+  
+  nf_comp_outcome[["loadings"]] %>% 
                     knitr::kable(digits = 2) %>%
                     kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
                     kableExtra::kable_paper(full_width = F)
+}
 
-#7c
-pca_7comp <- tetra_matrix[["rho"]] %>%  
-                psych::principal(nfactors = 7)
-
-
-seven_comp_outcome <- psych::kaiser(pca_7comp, rotate = "Varimax") %>% psych::fa.sort()
-
-seven_comp_outcome[["loadings"]] %>% 
-                    knitr::kable(digits = 2) %>%
-                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
-                    kableExtra::kable_paper(full_width = F)
-
-#8c
-pca_8comp <- tetra_matrix[["rho"]] %>%  
-                psych::principal(nfactors = 8)
+##for example, with the below tetrachoric correlation matrix
+#tetra_matrix <- df_binary1 %>% 
+#                  select(justify:pretty) %>% 
+#                    psych::tetrachoric()
+##the function works like this
+#pca_pattern_table(x = tetra_matrix[["rho"]], nfac = 5)
+```
 
 
-eight_comp_outcome <- psych::kaiser(pca_8comp, rotate = "Varimax") %>% psych::fa.sort()
+```{r pca_wordcloud_function}
+#Function to create a wordcloud of the top words with loadings >= threshold
+  #x is the correlation matrix
+  #nfac is the number of components/factors
+  #nword is the number of words included in the word cloud (default = 15)
+  #thresh determines which words (based on their component loading) should be filtered out. Default is to include the words with loadings greater than or equal 0.35
 
-eight_comp_outcome[["loadings"]] %>% 
-                    knitr::kable(digits = 2) %>%
-                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
-                    kableExtra::kable_paper(full_width = F)
-
-#9c
-pca_9comp <- tetra_matrix[["rho"]] %>%  
-                psych::principal(nfactors = 9)
-
-
-nine_comp_outcome <- psych::kaiser(pca_9comp, rotate = "Varimax") %>% psych::fa.sort()
-
-nine_comp_outcome[["loadings"]] %>% 
-                    knitr::kable(digits = 2) %>%
-                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
-                    kableExtra::kable_paper(full_width = F)
-
-#lets visualize the 7c
-top_loading_words <- seven_comp_outcome[["loadings"]] %>% 
+top_words_cloud <- function(x, nfac, nword = 15, thresh = 0.35){
+    
+  pca_nf_comp <- x %>%  
+                psych::principal(nfactors = nfac)
+  
+  nf_comp_outcome <- psych::kaiser(pca_nf_comp, rotate = "Varimax") %>% psych::fa.sort()
+  
+  top_words_filtered <- nf_comp_outcome[["loadings"]] %>% 
                         as.data.frame() %>% 
                         tibble::rownames_to_column("Word") %>% 
                         pivot_longer(cols = contains("RC"),
                                      names_to = "Component",
                                      values_to = "Loading") %>% 
                         group_by(Component) %>% 
-                                      slice_max(Loading, n = 20) %>% 
-                                      ungroup() %>% 
-                                      arrange(Component, -Loading)
-
-
-top_loading_words %>% 
-  group_by(Component) %>% 
-  mutate(Word = forcats::fct_reorder(Word, Loading)) %>% 
-  #ungroup() %>% 
-  filter(Loading >= 0.35) %>% 
-      ggplot(aes(Loading, Word, fill = factor(Component))) + 
-      geom_col(show.legend = FALSE) + 
-      facet_wrap(~ Component, scales = "free")
-
-#Word cloud
-top_words_filtered <- eight_comp_outcome[["loadings"]] %>% 
-                        as.data.frame() %>% 
-                        tibble::rownames_to_column("Word") %>% 
-                        pivot_longer(cols = contains("RC"),
-                                     names_to = "Component",
-                                     values_to = "Loading") %>% 
-                        group_by(Component) %>% 
-                                      slice_max(Loading, n = 15) %>% 
+                                      slice_max(Loading, n = nword) %>% 
                                       ungroup() %>% 
                                       arrange(Component, -Loading) %>% 
                         mutate(Word = forcats::fct_reorder(Word, Loading)) %>% 
-                        filter(Loading >= 0.35)
+                        filter(Loading >= thresh)
 
 top_words_filtered %>% 
     ggplot(aes(label = Word, size = Loading, color = factor(sample.int(10, nrow(top_words_filtered), replace = TRUE)))) +
@@ -136,47 +92,113 @@ top_words_filtered %>%
     scale_size_area(max_size = 10) +
     facet_wrap(~ Component) +
     theme_minimal()
+}
+
+
+##for example, with the below tetrachoric correlation matrix
+#tetra_matrix <- df_binary1 %>% 
+#                  select(justify:pretty) %>% 
+#                    psych::tetrachoric()
+##the function works like this
+#top_words_cloud(x = tetra_matrix[["rho"]], nfac = 4)
 ```
 
 
+```{r pca_barchart_function}
+#Function to create a barchart of the top words with loadings >= threshold
+
+top_words_barchart <- function(x, nfac, nword = 15, thresh = 0.35){
+    
+  pca_nf_comp <- x %>%  
+                psych::principal(nfactors = nfac)
+  
+  nf_comp_outcome <- psych::kaiser(pca_nf_comp, rotate = "Varimax") %>% psych::fa.sort()
+  
+  top_loading_words <- nf_comp_outcome[["loadings"]] %>% 
+                          as.data.frame() %>% 
+                          tibble::rownames_to_column("Word") %>% 
+                          pivot_longer(cols = contains("RC"),
+                                       names_to = "Component",
+                                       values_to = "Loading") %>% 
+                          group_by(Component) %>% 
+                                        slice_max(Loading, n = nword) %>% 
+                                        ungroup() %>% 
+                                        arrange(Component, -Loading)
+  
+  
+  top_loading_words %>% 
+    group_by(Component) %>% 
+    mutate(Word = forcats::fct_reorder(Word, Loading)) %>% 
+    #ungroup() %>% 
+    filter(Loading >= thresh) %>% 
+        ggplot(aes(Loading, Word, fill = factor(Component))) + 
+        geom_col(show.legend = FALSE) + 
+        facet_wrap(~ Component, scales = "free")
+
+}
+
+#example
+#top_words_barchart(x = tetra_matrix[["rho"]], nfac = 4)
+```
+
+# PCA
+
+## Tetrachoric Correlation Matrix
+
 ```{r}
+#create a tetrachoric correlation matrix
+tetra_matrix <- df_binary1 %>% 
+                  select(justify:pretty) %>% 
+                    psych::tetrachoric()
+#scree plot
+tetra_matrix[["rho"]] %>% 
+  psych::scree(hline = -1, factors = FALSE)
 
-###what if we do 6c with pearson's cor?
-pca_6comp <- df_binary1 %>% 
-                  select(situation:eventually) %>% 
-                psych::principal(nfactors = 6)
-
-six_comp_outcome <- psych::kaiser(pca_6comp, rotate = "Varimax") %>% psych::fa.sort()
-
-six_comp_outcome[["loadings"]] %>% 
-                    knitr::kable(digits = 2) %>%
-                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
-                    kableExtra::kable_paper(full_width = F)
+#parallel analysis
+tetra_matrix[["rho"]] %>% 
+  psych::fa.parallel(n.obs = 1151, fa = "pc", fm = "ml")
 
 
-#four components
-pca_9comp <- df_binary1 %>% 
-                  select(situation:eventually) %>% 
-                psych::principal(nfactors = 9)
 
-nine_comp_outcome <- psych::kaiser(pca_9comp, rotate = "Varimax") %>% psych::fa.sort()
+#4c
+pca_pattern_table(x = tetra_matrix[["rho"]], nfac = 4)
+top_words_cloud(x = tetra_matrix[["rho"]], nfac = 4)
+top_words_barchart(x = tetra_matrix[["rho"]], nfac = 4)
 
-nine_comp_outcome[["loadings"]] %>% 
-                    knitr::kable(digits = 2) %>%
-                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
-                    kableExtra::kable_paper(full_width = F)
+#7c
+pca_pattern_table(x = tetra_matrix[["rho"]], nfac = 7)
+top_words_cloud(x = tetra_matrix[["rho"]], nfac = 7) #2 words in component 7
+top_words_barchart(x = tetra_matrix[["rho"]], nfac = 7)
 
-#nine components
-pca_9comp <- df_binary %>% 
-              select(angry:eventually) %>% 
-                psych::principal(nfactors = 9)
+```
 
-nine_comp_outcome <- psych::kaiser(pca_9comp, rotate = "Varimax") %>% psych::fa.sort()
 
-nine_comp_outcome[["loadings"]] %>% 
-                    knitr::kable(digits = 2) %>%
-                    kableExtra::kable_styling(bootstrap_options = c("striped", "hover")) %>% 
-                    kableExtra::kable_paper(full_width = F)
+## Pearson Correlation Matrix
+
+```{r}
+#create a correlation matrix
+correl_matrix <- df_binary1 %>% 
+                  select(justify:pretty) %>% 
+                    cor()
+#scree plot
+correl_matrix %>% 
+  psych::scree(hline = -1, factors = FALSE) #probably 7
+
+#parallel analysis
+correl_matrix %>% 
+  psych::fa.parallel(n.obs = 1151, fa = "pc", fm = "ml") #max 18
+
+
+
+#7c
+pca_pattern_table(x = correl_matrix, nfac = 7)
+top_words_cloud(x = correl_matrix, nfac = 7, thresh = 0.3)
+top_words_barchart(x = correl_matrix, nfac = 7)
+
+#8c
+pca_pattern_table(x = correl_matrix, nfac = 8)
+top_words_cloud(x = correl_matrix, nfac = 8, thresh = 0.3)
+top_words_barchart(x = correl_matrix, nfac = 8)
 
 ```
 
