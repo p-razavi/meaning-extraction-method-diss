@@ -12,7 +12,7 @@ editor_options:
 
 ```{r setup, include=FALSE, warning=FALSE}
 #load libraries
-package_list <- c("dplyr", "tidyr", "ggplot2", "tidytext", "topicmodels", "stm")
+package_list <- c("dplyr", "tidyr", "ggplot2", "tidytext", "topicmodels", "rlang")
 lapply(package_list, require, character.only = TRUE)
 
 
@@ -64,9 +64,9 @@ pca_pattern_table <- function(x, nfac){
   #x is the correlation matrix
   #nfac is the number of components/factors
   #nword is the number of words included in the word cloud (default = 15)
-  #thresh determines which words (based on their component loading) should be filtered out. Default is to include the words with loadings greater than or equal 0.35
+  #thresh determines which words (based on their component loading) should be filtered out. Default is to include the words with loadings greater than or equal 0.30
 
-top_words_cloud <- function(x, nfac, nword = 15, thresh = 0.35){
+top_words_cloud <- function(x, nfac, nword = 15, thresh = 0.30){
     
   pca_nf_comp <- x %>%  
                 psych::principal(nfactors = nfac)
@@ -107,7 +107,7 @@ top_words_filtered %>%
 ```{r pca_barchart_function}
 #Function to create a barchart of the top words with loadings >= threshold
 
-top_words_barchart <- function(x, nfac, nword = 15, thresh = 0.35){
+top_words_barchart <- function(x, nfac, nword = 15, thresh = 0.30){
     
   pca_nf_comp <- x %>%  
                 psych::principal(nfactors = nfac)
@@ -162,13 +162,18 @@ tetra_matrix[["rho"]] %>%
 
 #4c
 pca_pattern_table(x = tetra_matrix[["rho"]], nfac = 4)
-top_words_cloud(x = tetra_matrix[["rho"]], nfac = 4)
+top_words_cloud(x = tetra_matrix[["rho"]], nfac = 4, thresh = 0.2)
 top_words_barchart(x = tetra_matrix[["rho"]], nfac = 4)
 
 #7c
 pca_pattern_table(x = tetra_matrix[["rho"]], nfac = 7)
-top_words_cloud(x = tetra_matrix[["rho"]], nfac = 7) #2 words in component 7
+top_words_cloud(x = tetra_matrix[["rho"]], nfac = 7, thresh = 0.2)
 top_words_barchart(x = tetra_matrix[["rho"]], nfac = 7)
+
+#12c (because this was what emerged in STM)
+pca_pattern_table(x = tetra_matrix[["rho"]], nfac = 12)
+top_words_cloud(x = tetra_matrix[["rho"]], nfac = 12, thresh = 0.3)
+top_words_barchart(x = tetra_matrix[["rho"]], nfac = 12)
 
 ```
 
@@ -189,16 +194,39 @@ correl_matrix %>%
   psych::fa.parallel(n.obs = 1151, fa = "pc", fm = "ml") #max 18
 
 
+#4c
+pca_pattern_table(x = correl_matrix, nfac = 4)
+top_words_cloud(x = correl_matrix, nfac = 4, thresh = 0.2)
+top_words_barchart(x = correl_matrix, nfac = 4)
 
 #7c
 pca_pattern_table(x = correl_matrix, nfac = 7)
-top_words_cloud(x = correl_matrix, nfac = 7, thresh = 0.3)
+top_words_cloud(x = correl_matrix, nfac = 7, thresh = 0.2)
 top_words_barchart(x = correl_matrix, nfac = 7)
 
-#8c
-pca_pattern_table(x = correl_matrix, nfac = 8)
-top_words_cloud(x = correl_matrix, nfac = 8, thresh = 0.3)
-top_words_barchart(x = correl_matrix, nfac = 8)
+#12c
+pca_pattern_table(x = correl_matrix, nfac = 12)
+top_words_cloud(x = correl_matrix, nfac = 12, thresh = 0.3)
+top_words_barchart(x = correl_matrix, nfac = 12)
 
 ```
+
+
+## Create a df of the Outcome (for dictionary analyses)
+
+```{r}
+ pca_8_comp <- tetra_matrix[["rho"]] %>%  
+                psych::principal(nfactors = 8)
+
+  eight_comp_outcome <- psych::kaiser(pca_8_comp, rotate = "Varimax") %>% psych::fa.sort()
+
+  pca_8c_pattern <- eight_comp_outcome[["loadings"]] %>% 
+                as.data.frame() %>% 
+                tibble::rownames_to_column("word")
+
+  #save the df
+  #write.csv(pca_8c_pattern, "mem_pca_8c_pattern_matrix.csv")
+
+```
+
 
