@@ -54,14 +54,14 @@ extract_top_words_weights <- function(pattern_matrix, component, thresh = 0.3){
   
 }    
   
-theme_1 <- extract_top_words_weights(pattern_matrix, component = RC1)
-theme_2 <- extract_top_words_weights(pattern_matrix, component = RC2)
-theme_3 <- extract_top_words_weights(pattern_matrix, component = RC3)
-theme_4 <- extract_top_words_weights(pattern_matrix, component = RC4)
-theme_5 <- extract_top_words_weights(pattern_matrix, component = RC5)
-theme_6 <- extract_top_words_weights(pattern_matrix, component = RC6)
-theme_7 <- extract_top_words_weights(pattern_matrix, component = RC7)
-theme_8 <- extract_top_words_weights(pattern_matrix, component = RC8)
+theme_1 <- extract_top_words_weights(pattern_matrix, component = RC1, thresh = .30)
+theme_2 <- extract_top_words_weights(pattern_matrix, component = RC2, thresh = .30)
+theme_3 <- extract_top_words_weights(pattern_matrix, component = RC3, thresh = .30)
+theme_4 <- extract_top_words_weights(pattern_matrix, component = RC4, thresh = .30)
+theme_5 <- extract_top_words_weights(pattern_matrix, component = RC5, thresh = .30)
+theme_6 <- extract_top_words_weights(pattern_matrix, component = RC6, thresh = .30)
+theme_7 <- extract_top_words_weights(pattern_matrix, component = RC7, thresh = .30)
+theme_8 <- extract_top_words_weights(pattern_matrix, component = RC8, thresh = .30)
 
 
 ```
@@ -91,9 +91,9 @@ theme_1$word[3] <- "break"
 tokens_w_theme_1 <- tokenized_narratives %>% 
                           inner_join(theme_1)
 
-tokens_w_theme_1 %>% 
-  group_by(ResponseId) %>% 
-  mutate(theme_1 = mean(RC1)) 
+#tokens_w_theme_1 %>% 
+#  group_by(ResponseId) %>% 
+#  mutate(theme_1 = mean(RC1)) 
 
 narratives_w_theme1 <- tokens_w_theme_1 %>% 
                           group_by(ResponseId) %>% 
@@ -102,7 +102,7 @@ narratives_w_theme1 <- tokens_w_theme_1 %>%
                           inner_join(df) %>% 
                           select(ResponseId, Condition, all_narratives, aggregate_value)
 
-  
+psych::describeBy(narratives_w_theme1$aggregate_value, group = narratives_w_theme1$Condition)  
 ind_ttest_report(narratives_w_theme1$Condition, narratives_w_theme1$aggregate_value)
 
 ```
@@ -126,7 +126,8 @@ narratives_w_theme1_dich <- tokens_w_theme_1_dich %>%
                                 ungroup() %>% 
                                 inner_join(df) %>% 
                                 mutate(word_count = stringr::str_count(all_narratives ,"\\W+")) %>% 
-                                mutate(rel_freq = freq*100/word_count) %>% 
+                                mutate(rel_freq = freq*100/word_count,
+                                       theme_presence = if_else(freq > 2, "Y", "N")) %>% 
                                 select(ResponseId, Condition, all_narratives, word_count, freq, rel_freq)
 
 #frequency
@@ -137,6 +138,88 @@ ind_ttest_report(narratives_w_theme1_dich$Condition, narratives_w_theme1_dich$fr
 psych::describeBy(narratives_w_theme1_dich$rel_freq, group = narratives_w_theme1_dich$Condition)
 ind_ttest_report(narratives_w_theme1_dich$Condition, narratives_w_theme1_dich$rel_freq)
 
+cor.test(narratives_w_theme1_dich$freq, narratives_w_theme1_dich$rel_freq, method = c("pearson"))[["estimate"]]
+cor.test(narratives_w_theme1_dich$freq, narratives_w_theme1_dich$rel_freq, method = c("spearman"))[["estimate"]]
+
+```
+
+```{r}
+calc_mem_diff <- function(theme_words) {
+  tokens_w_theme_dich <- df %>% 
+                            tidytext::unnest_tokens(input = all_narratives,
+                                                    output = word,
+                                                    format = "text",
+                                                    token = "words",
+                                                    drop = TRUE,
+                                                    to_lower = TRUE) %>% 
+                            anti_join(stop_words) %>% 
+                            mutate(theme = if_else(word %in% theme_words, 1, 0))
+  
+  narratives_w_theme_dich <- tokens_w_theme_dich %>% 
+                                group_by(ResponseId) %>% 
+                                summarise(freq = sum(theme)) %>% 
+                                filter(freq != 0) %>% 
+                                ungroup() %>% 
+                                inner_join(df) %>% 
+                                mutate(word_count = stringr::str_count(all_narratives ,"\\W+")) %>% 
+                                mutate(rel_freq = freq*100/word_count,
+                                       theme_presence = if_else(freq > 2, "Y", "N")) %>% 
+                                select(ResponseId, Condition, all_narratives, word_count, freq, rel_freq, theme_presence)
+  print(">>>FREQUENCY")
+  psych::describeBy(narratives_w_theme_dich$freq, group = narratives_w_theme_dich$Condition, mat = TRUE) %>% print()
+  ind_ttest_report(narratives_w_theme_dich$Condition, narratives_w_theme_dich$freq)
+  print(">>>RELATIVE FREQUENCY")
+  psych::describeBy(narratives_w_theme_dich$rel_freq, group = narratives_w_theme_dich$Condition, mat = TRUE) %>% print()
+  ind_ttest_report(narratives_w_theme_dich$Condition, narratives_w_theme_dich$rel_freq)
+  print(">>>PRESENCE/ABSENCE OF THEME")
+  table(narratives_w_theme_dich$Condition, narratives_w_theme_dich$theme_presence) %>% print()
+  chisq.test(narratives_w_theme_dich$Condition, narratives_w_theme_dich$theme_presence, correct=FALSE) %>% print()
+  print(">>> RELATION BETWEEN THE TWO")
+  cor.test(narratives_w_theme_dich$freq, narratives_w_theme_dich$rel_freq, method = c("pearson"))[["estimate"]] %>% print()
+  #cor.test(narratives_w_theme_dich$freq, narratives_w_theme_dich$rel_freq, method = c("spearman"))[["estimate"]] %>% print()
+}
+
+calc_mem_diff(theme_1$word)
+
+calc_mem_diff(theme_2$word)
+
+calc_mem_diff(theme_3$word)
+
+calc_mem_diff(theme_4$word)
+
+calc_mem_diff(theme_5$word)
+
+calc_mem_diff(theme_6$word)
+
+calc_mem_diff(theme_7$word)
+
+calc_mem_diff(theme_8$word)
+
+
+
+```
+
+
+
+
+What if we create a theme 1 that is inclusive of all the 92 terms?
+Doesn't solve anything!
+```{r}
+theme_1_inclusive <- pattern_matrix %>% 
+                        select(word, RC1)
+
+tokens_w_theme_1_inclusive <- tokenized_narratives %>% 
+                                  inner_join(theme_1_inclusive)
+
+narratives_w_theme1_inclusive <- tokens_w_theme_1_inclusive %>% 
+                                    group_by(ResponseId) %>% 
+                                    summarise(aggregate_value = mean(RC1)) %>% 
+                                    ungroup() %>% 
+                                    inner_join(df) %>% 
+                                    select(ResponseId, Condition, all_narratives, aggregate_value)
+
+psych::describeBy(narratives_w_theme1_inclusive$aggregate_value, group = narratives_w_theme1_inclusive$Condition)  
+ind_ttest_report(narratives_w_theme1_inclusive$Condition, narratives_w_theme1_inclusive$aggregate_value)
 
 ```
 
