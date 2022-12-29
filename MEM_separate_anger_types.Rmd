@@ -26,7 +26,7 @@ justified_word_frequency <- read.csv("C:/Users/Pooya/Dropbox (University of Oreg
 #find and remove words with >= 30% frequency
 justified_word_list <- justified_word_frequency %>% 
               filter(Percentage.of.Rows.with.Word >= 30 | Percentage.of.Rows.with.Word < 5) %>% 
-              select(Word)
+              select(Word, Percentage.of.Rows.with.Word)
 
 justified_df_binary1 <- justified_df_binary %>% 
                 select(-justified_word_list$Word)
@@ -102,16 +102,16 @@ top_words_cloud <- function(x, nfac, nword = 15, thresh = 0.30){
                                       ungroup() %>% 
                                       arrange(Component, -Loading) %>% 
                         mutate(Word = forcats::fct_reorder(Word, Loading)) %>% 
-                        filter(Loading >= thresh)
+                        filter(Loading >= thresh) %>% 
+                        mutate(Component = stringr::str_replace(Component, "RC", "Component "))
 
 top_words_filtered %>% 
     ggplot(aes(label = Word, size = Loading, color = factor(sample.int(10, nrow(top_words_filtered), replace = TRUE)))) +
-    ggwordcloud::geom_text_wordcloud(rm_outside = TRUE) +
-    scale_size_area(max_size = 10) +
+    ggwordcloud::geom_text_wordcloud(rm_outside = TRUE, family = "serif") +
+    scale_size_area(max_size = 9) +
     facet_wrap(~ Component) +
-    theme_minimal()
+    theme_minimal(base_family = "serif", base_size = 14)
 }
-
 
 ##for example, with the below tetrachoric correlation matrix
 #tetra_matrix <- df_binary1 %>% 
@@ -159,6 +159,67 @@ top_words_barchart <- function(x, nfac, nword = 15, thresh = 0.30){
 #top_words_barchart(x = tetra_matrix[["rho"]], nfac = 4)
 ```
 
+# Simple Wordclouds for Each Anger Type
+
+```{r}
+
+rbind(justified_word_frequency, unjustified_word_frequency) %>% 
+  filter(Percentage.of.Rows.with.Word <= 30 & Percentage.of.Rows.with.Word > 5) %>% 
+  psych::describe() %>% 
+  as.data.frame() %>% 
+  filter(vars == 4)
+
+# high frequency words
+
+## Justified Anger
+
+justified_word_frequency %>% 
+  filter(Percentage.of.Rows.with.Word <= 30 & Percentage.of.Rows.with.Word >= 8.0821) %>% 
+  ggplot(data = ., aes(label = Word, size = Percentage.of.Rows.with.Word, color = factor(sample.int(10, nrow(.), replace = TRUE)))) +
+    ggwordcloud::geom_text_wordcloud(rm_outside = TRUE, family = "serif") +
+    scale_size_area(max_size = 11) +
+    labs(title = "Justified Anger",
+         subtitle = "Above Median Frequency Words") +
+    theme_minimal(base_family = "serif")
+
+## Unjustified Anger
+
+unjustified_word_frequency %>% 
+  filter(Percentage.of.Rows.with.Word <= 30 & Percentage.of.Rows.with.Word >= 8.0821) %>% 
+  ggplot(data = ., aes(label = Word, size = Percentage.of.Rows.with.Word, color = factor(sample.int(10, nrow(.), replace = TRUE)))) +
+    ggwordcloud::geom_text_wordcloud(rm_outside = TRUE, family = "serif") +
+    scale_size_area(max_size = 11) +
+    labs(title = "Unjustified Anger",
+         subtitle = "Above Median Frequency Words") +
+    theme_minimal(base_family = "serif")
+
+
+# low frequency words
+
+## Justified Anger
+
+justified_word_frequency %>% 
+  filter(Percentage.of.Rows.with.Word < 8.0821 & Percentage.of.Rows.with.Word >= 5) %>% 
+  ggplot(data = ., aes(label = Word, size = Percentage.of.Rows.with.Word^2, color = factor(sample.int(10, nrow(.), replace = TRUE)))) +
+    ggwordcloud::geom_text_wordcloud(rm_outside = TRUE, family = "serif") +
+    scale_size_area(max_size = 9) +
+    labs(title = "Justified Anger",
+         subtitle = "Below Median Frequency Words") +
+    theme_minimal(base_family = "serif")
+
+## Unjustified Anger
+
+unjustified_word_frequency %>% 
+  filter(Percentage.of.Rows.with.Word < 8.0821 & Percentage.of.Rows.with.Word >= 5) %>% 
+  ggplot(data = ., aes(label = Word, size = Percentage.of.Rows.with.Word^2, color = factor(sample.int(10, nrow(.), replace = TRUE)))) +
+    ggwordcloud::geom_text_wordcloud(rm_outside = TRUE, family = "serif") +
+    scale_size_area(max_size = 9) +
+    labs(title = "Unjustified Anger",
+         subtitle = "Below Median Frequency Words") +
+    theme_minimal(base_family = "serif")
+
+```
+
 # Justified Anger MEM
 
 ## PCA
@@ -182,6 +243,49 @@ top_words_barchart(x = tetra_matrix_just[["rho"]], nfac = 5)
 pca_pattern_table(x = tetra_matrix_just[["rho"]], nfac = 6)
 top_words_cloud(x = tetra_matrix_just[["rho"]], nfac = 6, thresh = 0.2)
 top_words_barchart(x = tetra_matrix_just[["rho"]], nfac = 6)
+
+```
+
+
+```{r}
+#create a pearson correlation matrix
+pearson_matrix_just <- justified_df_binary1 %>% 
+                  select(justify:deal) %>% 
+                    cor()
+#scree plot
+just_scree <- pearson_matrix_just %>% 
+  psych::scree(hline = -1, factors = FALSE)
+
+data.frame(Component = c(1:length(just_scree$pcv)),
+           EigenValues = just_scree$pcv
+                         ) %>% 
+  ggplot(aes(x = Component, y = EigenValues)) +
+  geom_line() +
+  geom_point(color = "darkblue") +
+  labs(title = "Justified Anger",
+       y = "Eigen Values") +
+  theme_bw(base_family = "serif")
+
+#5c (*)
+pca_pattern_table(x = pearson_matrix_just, nfac = 5)
+top_words_cloud(x = pearson_matrix_just, nfac = 5, thresh = 0.25)
+top_words_barchart(x = pearson_matrix_just, nfac = 5)
+
+#6c
+pca_pattern_table(x = pearson_matrix_just, nfac = 6)
+top_words_cloud(x = pearson_matrix_just, nfac = 6, thresh = 0.25)
+top_words_barchart(x = pearson_matrix_just, nfac = 6)
+
+#7c
+pca_pattern_table(x = pearson_matrix_just, nfac = 7)
+top_words_cloud(x = pearson_matrix_just, nfac = 7, thresh = 0.25)
+top_words_barchart(x = pearson_matrix_just, nfac = 7)
+
+#9c
+pca_pattern_table(x = pearson_matrix_just, nfac = 9)
+top_words_cloud(x = pearson_matrix_just, nfac = 9, thresh = 0.25)
+top_words_barchart(x = pearson_matrix_just, nfac = 9)
+
 
 ```
 
@@ -211,5 +315,47 @@ top_words_barchart(x = tetra_matrix_unjust[["rho"]], nfac = 7)
 
 ```
 
+```{r}
+#create a pearson correlation matrix
+pearson_matrix_unjust <- unjustified_df_binary1 %>% 
+                  select(justify:car) %>% 
+                    cor()
+#scree plot
+pearson_matrix_unjust %>% 
+  psych::scree(hline = -1, factors = FALSE)
 
+unjust_scree <- pearson_matrix_unjust %>% 
+  psych::scree(hline = -1, factors = FALSE)
+
+data.frame(Component = c(1:length(unjust_scree$pcv)),
+           EigenValues = unjust_scree$pcv
+                         ) %>% 
+  ggplot(aes(x = Component, y = EigenValues)) +
+  geom_line() +
+  geom_point(color = "darkgreen") +
+  labs(title = "Unjustified Anger",
+       y = "Eigen Values") +
+  theme_bw(base_family = "serif")
+
+#4c
+pca_pattern_table(x = pearson_matrix_unjust, nfac = 4)
+top_words_cloud(x = pearson_matrix_unjust, nfac = 4, thresh = 0.2)
+top_words_barchart(x = pearson_matrix_unjust, nfac = 4)
+
+#6c
+pca_pattern_table(x = pearson_matrix_unjust, nfac = 6)
+top_words_cloud(x = pearson_matrix_unjust, nfac = 6, thresh = 0.25)
+top_words_barchart(x = pearson_matrix_unjust, nfac = 6)
+
+#7c (*)
+pca_pattern_table(x = pearson_matrix_unjust, nfac = 7)
+top_words_cloud(x = pearson_matrix_unjust, nfac = 7, thresh = 0.25)
+top_words_barchart(x = pearson_matrix_unjust, nfac = 7)
+
+#11c
+pca_pattern_table(x = pearson_matrix_unjust, nfac = 11)
+top_words_cloud(x = pearson_matrix_unjust, nfac = 11, thresh = 0.25)
+top_words_barchart(x = pearson_matrix_unjust, nfac = 11)
+
+```
 
