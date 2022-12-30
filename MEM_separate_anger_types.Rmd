@@ -103,7 +103,7 @@ top_words_cloud <- function(x, nfac, nword = 15, thresh = 0.30){
                                       arrange(Component, -Loading) %>% 
                         mutate(Word = forcats::fct_reorder(Word, Loading)) %>% 
                         filter(Loading >= thresh) %>% 
-                        mutate(Component = stringr::str_replace(Component, "RC", "Component "))
+                        mutate(Component = stringr::str_replace(Component, "RC", "Theme "))
 
 top_words_filtered %>% 
     ggplot(aes(label = Word, size = Loading, color = factor(sample.int(10, nrow(top_words_filtered), replace = TRUE)))) +
@@ -222,7 +222,7 @@ unjustified_word_frequency %>%
 
 # Justified Anger MEM
 
-## PCA
+## Tetrachoric - PCA
 
 ```{r}
 #create a tetrachoric correlation matrix
@@ -246,6 +246,7 @@ top_words_barchart(x = tetra_matrix_just[["rho"]], nfac = 6)
 
 ```
 
+## Pearson - PCA
 
 ```{r}
 #create a pearson correlation matrix
@@ -264,6 +265,7 @@ data.frame(Component = c(1:length(just_scree$pcv)),
   geom_point(color = "darkblue") +
   labs(title = "Justified Anger",
        y = "Eigen Values") +
+  lims(x = c(1, 80)) +
   theme_bw(base_family = "serif")
 
 #5c (*)
@@ -291,7 +293,7 @@ top_words_barchart(x = pearson_matrix_just, nfac = 9)
 
 # Unjustified Anger MEM
 
-## PCA
+## tetrachoric - PCA
 
 ```{r}
 #create a tetrachoric correlation matrix
@@ -315,15 +317,14 @@ top_words_barchart(x = tetra_matrix_unjust[["rho"]], nfac = 7)
 
 ```
 
+## Pearson - PCA
+
 ```{r}
 #create a pearson correlation matrix
 pearson_matrix_unjust <- unjustified_df_binary1 %>% 
                   select(justify:car) %>% 
                     cor()
 #scree plot
-pearson_matrix_unjust %>% 
-  psych::scree(hline = -1, factors = FALSE)
-
 unjust_scree <- pearson_matrix_unjust %>% 
   psych::scree(hline = -1, factors = FALSE)
 
@@ -335,6 +336,7 @@ data.frame(Component = c(1:length(unjust_scree$pcv)),
   geom_point(color = "darkgreen") +
   labs(title = "Unjustified Anger",
        y = "Eigen Values") +
+  lims(x = c(1, 80)) +
   theme_bw(base_family = "serif")
 
 #4c
@@ -347,10 +349,15 @@ pca_pattern_table(x = pearson_matrix_unjust, nfac = 6)
 top_words_cloud(x = pearson_matrix_unjust, nfac = 6, thresh = 0.25)
 top_words_barchart(x = pearson_matrix_unjust, nfac = 6)
 
-#7c (*)
+#7c 
 pca_pattern_table(x = pearson_matrix_unjust, nfac = 7)
 top_words_cloud(x = pearson_matrix_unjust, nfac = 7, thresh = 0.25)
 top_words_barchart(x = pearson_matrix_unjust, nfac = 7)
+
+#9c (*)
+pca_pattern_table(x = pearson_matrix_unjust, nfac = 9)
+top_words_cloud(x = pearson_matrix_unjust, nfac = 9, thresh = 0.25)
+top_words_barchart(x = pearson_matrix_unjust, nfac = 9)
 
 #11c
 pca_pattern_table(x = pearson_matrix_unjust, nfac = 11)
